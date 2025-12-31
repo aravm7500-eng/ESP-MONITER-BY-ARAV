@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 GPS & Sensor Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: 'Arial', sans-serif; background: #0f0c29; color: white; text-align: center; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; }
+        .box { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 15px; margin: 10px; width: 140px; border: 1px solid #00d2ff; }
+        button { background: #00d2ff; border: none; padding: 15px 30px; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
+        .value { font-size: 1.5em; color: #00d2ff; font-weight: bold; }
+        p { margin: 5px 0; font-size: 0.9em; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 Web Dashboard</h1>
+    <button onclick="connectBLE()">Connect Bluetooth</button>
+    
+    <div class="container">
+        <div class="box">
+            <p>Temp</p>
+            <div id="temp" class="value">--°C</div>
+        </div>
+        <div class="box">
+            <p>Humidity</p>
+            <div id="hum" class="value">--%</div>
+        </div>
+        <div class="box">
+            <p>Latitude</p>
+            <div id="lat" class="value">--</div>
+        </div>
+        <div class="box">
+            <p>Longitude</p>
+            <div id="lon" class="value">--</div>
+        </div>
+    </div>
+
+    <script>
+        async function connectBLE() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'ESP32_Monitor' }],
+                    optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+                const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+                
+                characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = new TextDecoder().decode(event.target.value);
+                    console.log("Data Received: ", value);
+                    
+                    // Data Format: T:25.5,H:60.2,LAT:28.61,LON:77.23
+                    const parts = value.split(',');
+                    parts.forEach(part => {
+                        const pair = part.split(':');
+                        if(pair[0] === 'T') document.getElementById('temp').innerText = pair[1] + "°C";
+                        if(pair[0] === 'H') document.getElementById('hum').innerText = pair[1] + "%";
+                        if(pair[0] === 'LAT') document.getElementById('lat').innerText = pair[1];
+                        if(pair[0] === 'LON') document.getElementById('lon').innerText = pair[1];
+                    });
+                }); 
+                alert("Connected Successfully!");
+            } catch (e) { alert("Error: " + e); }
+        }
+    </script>
+</body>
+</html>
